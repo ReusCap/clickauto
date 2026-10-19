@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Click Test</title>
+<style>
+  :root { --bg:#f6f7f9; --fg:#1d2330; --muted:#667085; --card:#fff; --line:#e3e6eb; --accent:#2f6fed; --hit:#e8f0ff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171c; --fg:#e7eaf0; --muted:#98a2b3; --card:#1d2128; --line:#2c323c; --accent:#6f9bff; --hit:#1f2a44; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:15px/1.5 "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width:720px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  p.hint { color:var(--muted); margin:0 0 16px; }
+  #pad { user-select:none; height:260px; border:2px dashed var(--accent); border-radius:14px; background:var(--card);
+         display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--muted); cursor:crosshair; }
+  #pad.active { background:var(--hit); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin:16px 0; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .stat b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
+  .stat span { color:var(--muted); font-size:13px; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>오토클릭 측정 페이지</h1>
+  <p class="hint">아래 영역 위에 커서를 두고 오토클릭을 실행하세요. 클릭 사이 간격과 초당 클릭 수(CPS)를 측정합니다.</p>
+
+  <div id="pad">여기를 클릭</div>
+
+  <div class="stats">
+    <div class="stat"><span>총 클릭</span><b id="total">0</b></div>
+    <div class="stat"><span>실측 CPS (최근 1초)</span><b id="cps">0</b></div>
+    <div class="stat"><span>평균 간격</span><b id="avg">-</b></div>
+    <div class="stat"><span>최소 간격</span><b id="min">-</b></div>
+    <div class="stat"><span>최대 간격</span><b id="max">-</b></div>
+    <div class="stat"><span>놓친 클릭 (down ≠ click)</span><b id="miss">0</b></div>
+  </div>
+
+  <button id="reset">초기화</button>
+</main>
+
+<script>
+  const pad = document.getElementById('pad');
+  const el = id => document.getElementById(id);
+  let downs, clicks, last, gaps, recent;
+
+  function reset() {
+    downs = 0; clicks = 0; last = null; gaps = []; recent = [];
+    render();
+  }
+
+  pad.addEventListener('pointerdown', () => { downs++; });
+  pad.addEventListener('click', () => {
+    const now = performance.now();
+    clicks++;
+    if (last !== null) {
+      gaps.push(now - last);
+      if (gaps.length > 5000) gaps.shift();
+    }
+    last = now;
+    recent.push(now);
+  });
+  // 더블클릭 모드에서도 기본 동작(텍스트 선택 등)을 막는다
+  pad.addEventListener('mousedown', e => e.preventDefault());
+  el('reset').addEventListener('click', reset);
+
+  function render() {
+    const now = performance.now();
+    while (recent.length && now - recent[0] > 1000) recent.shift();
+    el('total').textContent = clicks.toLocaleString();
+    el('cps').textContent = recent.length.toLocaleString();
+    el('miss').textContent = Math.max(0, downs - clicks).toLocaleString();
+    if (gaps.length) {
+      const sum = gaps.reduce((a, b) => a + b, 0);
+      el('avg').textContent = (sum / gaps.length).toFixed(2) + ' ms';
+      el('min').textContent = Math.min(...gaps).toFixed(2) + ' ms';
+      el('max').textContent = Math.max(...gaps).toFixed(2) + ' ms';
+    } else {
+      el('avg').textContent = el('min').textContent = el('max').textContent = '-';
+    }
+    pad.classList.toggle('active', recent.length > 0);
+  }
+
+  reset();
+  setInterval(render, 100);
+</script>
+</body>
+</html>
