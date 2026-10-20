@@ -55,6 +55,7 @@ internal sealed class MainWindow : Window
     private readonly CheckBox _chkTopMost = new() { Content = "항상 위에 표시" };
 
     // 상태
+    private readonly TextBlock _lblStopHelp = Txt("");
     private readonly TextBlock _lblStatus = Txt("대기 중");
     private readonly TextBlock _lblStats = Txt("");
     private readonly Button _btnStartStop = new() { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center, Height = 44 };
@@ -69,6 +70,7 @@ internal sealed class MainWindow : Window
     private int _hotkeyKeyCode;
     private MacModifiers _hotkeyMods;
     private bool _capturingHotkey;
+    private bool _hotkeysOk;
     private int _startCountdown;
     private int _pickCountdown;
 
@@ -88,6 +90,7 @@ internal sealed class MainWindow : Window
         WireEvents();
 
         ApplyTrigger();
+        _platform.RequestPermissions();
         RefreshPermission();
         UpdateIntervalInfo();
         UpdateIdleUi(null);
@@ -103,13 +106,17 @@ internal sealed class MainWindow : Window
         _btnStartStop.FontWeight = FontWeight.Bold;
 
         // 권한 안내 배너
-        var openSettings = new Button { Content = "설정 열기" };
-        openSettings.Click += (_, _) => _platform.OpenAccessibilitySettings();
+        var openAccessibility = new Button { Content = "손쉬운 사용 열기" };
+        openAccessibility.Click += (_, _) => _platform.OpenPrivacySettings(inputMonitoring: false);
+        var openInputMonitoring = new Button { Content = "입력 모니터링 열기" };
+        openInputMonitoring.Click += (_, _) => _platform.OpenPrivacySettings(inputMonitoring: true);
         var recheck = new Button { Content = "다시 확인" };
         recheck.Click += (_, _) => RefreshPermission();
         _permissionText.TextWrapping = TextWrapping.Wrap;
         _permissionText.MaxWidth = 460;
-        _permissionBanner.Child = new StackPanel { Spacing = 8, Children = { _permissionText, Row(openSettings, recheck) } };
+        _permissionBanner.Child = new StackPanel { Spacing = 8, Children = { _permissionText, Row(openAccessibility, openInputMonitoring, recheck) } };
+        _lblStopHelp.TextWrapping = TextWrapping.Wrap;
+        _lblStopHelp.MaxWidth = 480;
         _permissionBanner.Padding = new Thickness(12, 10);
         _permissionBanner.CornerRadius = new CornerRadius(8);
         _permissionBanner.BorderThickness = new Thickness(1);
@@ -158,6 +165,7 @@ internal sealed class MainWindow : Window
         }
         root.Children.Add(_permissionBanner);
         root.Children.Add(_options);
+        root.Children.Add(_lblStopHelp);
         root.Children.Add(_lblStatus);
         root.Children.Add(_lblStats);
         root.Children.Add(_btnStartStop);
@@ -199,13 +207,37 @@ internal sealed class MainWindow : Window
     private bool RefreshPermission()
     {
         bool trusted = _platform.IsAccessibilityTrusted();
-        bool hotkeysOk = _platform.Hotkeys.Start();
-        _permissionBanner.IsVisible = !(trusted && hotkeysOk);
+        // 이벤트 탭이 만들어져도 입력 모니터링 권한이 없으면 키 입력이 오지 않으므로 둘 다 확인한다.
+        _hotkeysOk = _platform.Hotkeys.Start() && _platform.IsInputMonitoringGranted();
+        _permissionBanner.IsVisible = !(trusted && _hotkeysOk);
 
-        _permissionText.Text = !trusted
-            ? "클릭하려면 '손쉬운 사용' 권한이 필요해요.\n시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 AutoClickerMac을 켠 뒤 '다시 확인'을 누르세요."
-            : "단축키를 쓰려면 '입력 모니터링' 권한도 필요할 수 있어요.\n시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링에서 AutoClickerMac을 켠 뒤 '다시 확인'을 누르세요. (켜도 안 되면 앱을 다시 실행)";
+        var missing = new List<string>();
+        if (!trusted)
+            missing.Add("· 손쉬운 사용: 클릭에 필요");
+        if (!_hotkeysOk)
+            missing.Add("· 입력 모니터링: 단축키(F6, Esc)에 필요");
+        _permissionText.Text =
+            "시스템 설정 → 개인정보 보호 및 보안에서 AutoClickerMac을 켜주세요.\n"
+            + string.Join("\n", missing)
+            + "\n목록에 없으면 아래 + 버튼으로 응용 프로그램 폴더의 AutoClickerMac을 추가하세요."
+            + "\n켠 뒤에는 앱을 완전히 종료(⌘Q)하고 다시 실행해야 적용될 수 있어요.";
+
+        UpdateStopHelp();
         return trusted;
+    }
+
+    private void UpdateStopHelp()
+    {
+        if (_hotkeysOk)
+        {
+            _lblStopHelp.Text = $"정지: {HotkeyText()} · Esc · 마우스를 화면 왼쪽 위 모서리로 (고정 좌표면 마우스를 움직이기)";
+            _lblStopHelp.Foreground = Foreground;
+        }
+        else
+        {
+            _lblStopHelp.Text = "⚠ 지금은 단축키가 동작하지 않아요. 클릭을 멈추려면 마우스를 화면 왼쪽 위 모서리로 옮기세요. (고정 좌표면 마우스를 움직이기)";
+            _lblStopHelp.Foreground = WarnBrush;
+        }
     }
 
     // ---------------- 시작 / 정지 ----------------
@@ -241,6 +273,13 @@ internal sealed class MainWindow : Window
             return;
         }
         _settings = ReadSettingsFromUi();
+        if (_settings.Position == PositionMode.Fixed
+            && _settings.FixedX <= ClickEngine.FailsafeCornerPx && _settings.FixedY <= ClickEngine.FailsafeCornerPx)
+        {
+            _lblStatus.Text = "고정 좌표가 비상 정지 모서리(왼쪽 위)에 있어요. 다른 좌표를 지정하세요.";
+            _lblStatus.Foreground = WarnBrush;
+            return;
+        }
         _engine.Start(_settings);
     }
 
@@ -293,6 +332,8 @@ internal sealed class MainWindow : Window
             StopReason.Emergency => "비상 정지됨 (Esc)",
             StopReason.CountReached => "설정한 횟수를 모두 클릭함",
             StopReason.DurationReached => "최대 시간이 지나 정지함",
+            StopReason.CornerFailsafe => "마우스를 모서리로 옮겨 정지함",
+            StopReason.MouseMovedFailsafe => "마우스를 움직여 정지함",
             StopReason.Error => "오류로 정지함",
             StopReason.User => "정지됨",
             _ => "대기 중",
@@ -327,6 +368,7 @@ internal sealed class MainWindow : Window
         var mode = _rbHold.IsChecked == true ? TriggerMode.Hold : TriggerMode.Toggle;
         _platform.Hotkeys.Configure(mode, _hotkeyKeyCode, _hotkeyMods);
         _btnHotkey.Content = HotkeyText();
+        UpdateStopHelp();
         if (!_engine.IsRunning)
             UpdateIdleUi(null);
     }

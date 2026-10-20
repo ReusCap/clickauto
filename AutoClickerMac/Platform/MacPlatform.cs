@@ -19,13 +19,25 @@ internal sealed class MacPlatform : IPlatform
     public bool IsPreview => false;
     public IHotkeySource Hotkeys => _hotkeys;
 
-    public bool IsAccessibilityTrusted() => AXIsProcessTrusted();
+    public bool IsAccessibilityTrusted() => AXIsProcessTrusted() || CGPreflightPostEventAccess();
 
-    public void OpenAccessibilitySettings()
+    public bool IsInputMonitoringGranted() => CGPreflightListenEventAccess();
+
+    public void RequestPermissions()
     {
+        // 처음 한 번은 시스템 안내 창이 뜨고, 시스템 설정 목록에 AutoClickerMac이 등록된다.
+        if (!IsAccessibilityTrusted())
+            CGRequestPostEventAccess();
+        if (!IsInputMonitoringGranted())
+            CGRequestListenEventAccess();
+    }
+
+    public void OpenPrivacySettings(bool inputMonitoring)
+    {
+        string pane = inputMonitoring ? "Privacy_ListenEvent" : "Privacy_Accessibility";
         try
         {
-            Process.Start("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+            Process.Start("open", $"x-apple.systempreferences:com.apple.preference.security?{pane}");
         }
         catch (Exception)
         {

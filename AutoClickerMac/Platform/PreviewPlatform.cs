@@ -13,13 +13,25 @@ internal sealed class PreviewPlatform : IPlatform
     public bool IsPreview => true;
     public IHotkeySource Hotkeys => _hotkeys;
 
+    // 화면 모서리 비상 정지에 걸리지 않도록 가짜 커서는 화면 가운데쯤에 둔다.
+    private (int X, int Y) _cursor = (500, 500);
+
     public bool IsAccessibilityTrusted() => true;
 
-    public void OpenAccessibilitySettings() { }
+    public bool IsInputMonitoringGranted() => true;
 
-    public bool Click(MouseButtonKind button, bool doubleClick, (int X, int Y)? fixedPosition) => true;
+    public void RequestPermissions() { }
 
-    public (int X, int Y) GetCursorPosition() => (0, 0);
+    public void OpenPrivacySettings(bool inputMonitoring) { }
+
+    public bool Click(MouseButtonKind button, bool doubleClick, (int X, int Y)? fixedPosition)
+    {
+        if (fixedPosition is { } fp)
+            _cursor = fp;
+        return true;
+    }
+
+    public (int X, int Y) GetCursorPosition() => _cursor;
 
     public bool Wait(TimeSpan duration, WaitHandle cancel) =>
         duration <= TimeSpan.Zero ? !cancel.WaitOne(0) : !cancel.WaitOne(duration);

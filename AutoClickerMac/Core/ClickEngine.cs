@@ -3,7 +3,7 @@ using AutoClickerMac.Platform;
 
 namespace AutoClickerMac.Core;
 
-internal enum StopReason { User, Emergency, CountReached, DurationReached, Error }
+internal enum StopReason { User, Emergency, CountReached, DurationReached, CornerFailsafe, MouseMovedFailsafe, Error }
 
 /// <summary>
 /// 전용 스레드에서 정해진 간격으로 클릭을 주입한다. (Windows판 ClickEngine과 같은 스케줄링)
@@ -11,6 +11,12 @@ internal enum StopReason { User, Emergency, CountReached, DurationReached, Error
 /// </summary>
 internal sealed class ClickEngine : IDisposable
 {
+    /// <summary>커서가 화면 왼쪽 위 이 픽셀 안에 들어오면 정지한다.</summary>
+    public const int FailsafeCornerPx = 5;
+
+    /// <summary>고정 좌표 모드에서 커서가 이만큼 벗어나면 사람이 움직인 것으로 보고 정지한다.</summary>
+    public const int FailsafeMovePx = 30;
+
     private readonly IPlatform _platform;
     private readonly object _gate = new();
     private readonly ManualResetEvent _stopSignal = new(false);
@@ -85,6 +91,7 @@ internal sealed class ClickEngine : IDisposable
 
             var clock = Stopwatch.StartNew();
             double next = 0;
+            bool clickedOnce = false;
 
             while (true)
             {
@@ -94,6 +101,21 @@ internal sealed class ClickEngine : IDisposable
                     break;
                 }
 
+                // 단축키가 안 먹혀도 멈출 수 있도록, 권한이 필요 없는 마우스 위치로 비상 정지를 판단한다.
+                var (cx, cy) = _platform.GetCursorPosition();
+                if (cx <= FailsafeCornerPx && cy <= FailsafeCornerPx)
+                {
+                    reason = StopReason.CornerFailsafe;
+                    break;
+                }
+                if (fixedPos is { } fp && clickedOnce
+                    && (Math.Abs(cx - fp.Item1) > FailsafeMovePx || Math.Abs(cy - fp.Item2) > FailsafeMovePx))
+                {
+                    reason = StopReason.MouseMovedFailsafe; // 고정 좌표로 옮겨 둔 커서를 사람이 움직였다
+                    break;
+                }
+
+                clickedOnce = true;
                 if (_platform.Click(s.Button, doubleClick, fixedPos))
                     Interlocked.Increment(ref _totalClicks);
                 else

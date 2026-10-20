@@ -13,7 +13,13 @@ internal interface IPlatform : IDisposable
     /// <summary>손쉬운 사용 권한이 있는지 (없으면 클릭이 전달되지 않는다).</summary>
     bool IsAccessibilityTrusted();
 
-    void OpenAccessibilitySettings();
+    /// <summary>입력 모니터링 권한이 있는지 (없으면 단축키가 동작하지 않는다).</summary>
+    bool IsInputMonitoringGranted();
+
+    /// <summary>맥에 권한을 요청한다. 시스템 설정 목록에 앱이 등록되고, 처음엔 안내 창이 뜬다.</summary>
+    void RequestPermissions();
+
+    void OpenPrivacySettings(bool inputMonitoring);
 
     /// <summary>누름+뗌(더블이면 두 번)을 보낸다. 고정 좌표가 있으면 그 위치로 커서를 옮긴 뒤 클릭한다.</summary>
     bool Click(MouseButtonKind button, bool doubleClick, (int X, int Y)? fixedPosition);

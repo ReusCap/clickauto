@@ -120,11 +120,29 @@ internal static class MacNative
     [DllImport(CoreFoundation)]
     public static extern IntPtr CFStringCreateWithCString(IntPtr allocator, [MarshalAs(UnmanagedType.LPUTF8Str)] string cStr, uint encoding);
 
-    // ---------- 손쉬운 사용 권한 ----------
+    // ---------- 권한 (손쉬운 사용 / 입력 모니터링) ----------
 
     [DllImport(ApplicationServices)]
     [return: MarshalAs(UnmanagedType.I1)]
     public static extern bool AXIsProcessTrusted();
+
+    // 이벤트 주입 권한(손쉬운 사용) 확인/요청. 요청하면 시스템 설정 목록에 앱이 등록된다.
+    [DllImport(CoreGraphics)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool CGPreflightPostEventAccess();
+
+    [DllImport(CoreGraphics)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool CGRequestPostEventAccess();
+
+    // 키 입력 감시 권한(입력 모니터링) 확인/요청.
+    [DllImport(CoreGraphics)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool CGPreflightListenEventAccess();
+
+    [DllImport(CoreGraphics)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool CGRequestListenEventAccess();
 
     // ---------- 정밀 대기 ----------
 

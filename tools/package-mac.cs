@@ -10,7 +10,7 @@ using System.IO.Compression;
 
 const string AppName = "AutoClickerMac";
 const string Rid = "osx-arm64";
-const string Version = "0.1.0";
+const string Version = "0.1.1";
 
 string root = Directory.GetCurrentDirectory();
 if (!File.Exists(Path.Combine(root, AppName, $"{AppName}.csproj")))
