@@ -1,6 +1,6 @@
 # AutoClicker
 
-Windows용 오토클릭입니다. 클릭 간격을 1ms 단위로 직접 정할 수 있고, 빠르게 돌려도 CPU를 거의 쓰지 않도록 만들었습니다.
+Windows용 오토클릭입니다. 맥용은 아래 [맥 버전](#맥-버전-autoclickermac)을 보세요. 클릭 간격을 1ms 단위로 직접 정할 수 있고, 빠르게 돌려도 CPU를 거의 쓰지 않도록 만들었습니다.
 
 ## 기능
 - **클릭 간격**: 1 ~ 60,000ms (기본 10ms = 초당 약 100회), 프리셋 100/50/10/5/1ms
@@ -37,6 +37,37 @@ dotnet publish AutoClicker -c Release -r win-x64 --self-contained -p:PublishSing
 ```
 
 `publish/AutoClicker.exe` 하나만 배포하면 됩니다.
+
+## 맥 버전 (AutoClickerMac)
+`AutoClickerMac/`는 애플 실리콘(M1~M4) 맥용 앱입니다. Avalonia UI로 만들었고, 기능은 Windows 버전과 같습니다.
+
+| 부분 | 사용하는 것 |
+|---|---|
+| 클릭 주입 | `CGEventCreateMouseEvent` + `CGEventPost` |
+| 대기 | `mach_wait_until` (절대 시각) |
+| 단축키 | `CGEventTap` (듣기 전용) |
+
+### 맥용 앱 만들기 (Windows에서도 가능)
+```bash
+dotnet run tools/package-mac.cs
+```
+`publish/AutoClickerMac-arm64.tar.gz`가 만들어집니다.
+
+### 맥에서 처음 실행하기
+1. `AutoClickerMac-arm64.tar.gz`를 더블클릭해서 압축을 풀고, `AutoClickerMac.app`을 `응용 프로그램` 폴더로 옮깁니다.
+2. 터미널에서 아래 두 명령을 실행합니다. 서명/공증이 없는 앱이라 필요해요.
+   ```bash
+   xattr -cr /Applications/AutoClickerMac.app
+   codesign --force --deep -s - /Applications/AutoClickerMac.app
+   ```
+3. 앱을 실행하면 권한 안내가 나옵니다. `시스템 설정` → `개인정보 보호 및 보안`에서
+   - `손쉬운 사용`: AutoClickerMac 켜기 (클릭에 필요)
+   - `입력 모니터링`: AutoClickerMac 켜기 (단축키에 필요할 수 있음)
+4. 앱에서 `다시 확인`을 누릅니다. 그래도 안 되면 앱을 껐다 켜세요.
+
+- 맥북은 F키를 쓰려면 `fn`을 같이 눌러야 합니다 (`fn` + `F6`).
+- 앱을 새로 빌드해서 바꾸면 권한을 다시 켜야 할 수 있습니다.
+- 맥이 아닌 곳에서 `dotnet run --project AutoClickerMac`로 실행하면 실제로 클릭하지 않는 미리보기 모드로 화면만 뜹니다.
 
 ## 측정 페이지
 `tools/click-test.html`을 브라우저로 열고 클릭 영역 위에 커서를 둔 채 실행하면 실측 CPS와 클릭 간격(평균/최소/최대)을 볼 수 있습니다.
